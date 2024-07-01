@@ -71,11 +71,14 @@ def GMRES(A, b, x0, maxiter=1000, eps=1e-4
         apply_A = lambda x: A @ x
 
     if innerproduct is None:
-        innerproduct = np.dot
+        innerproduct = lambda x,y: (x.conj() * y).sum()
+
     
     rk = b - apply_A(x0)
 
-    rk_norm = np.linalg.norm(rk)
+    b_norm = np.sqrt(innerproduct(b, b).real)
+    
+    rk_norm = np.sqrt(innerproduct(rk, rk).real)
     if rk_norm <= eps:
         return x0, {"converged": True, "k": 0}
 
@@ -83,9 +86,9 @@ def GMRES(A, b, x0, maxiter=1000, eps=1e-4
 
     v = [None, vk]
     
-    cs = np.zeros(maxiter + 2)
-    sn = np.zeros(maxiter + 2)
-    gamma = np.zeros(maxiter + 2)
+    cs = np.zeros(maxiter + 2, np.complex128)
+    sn = np.zeros(maxiter + 2, np.complex128)
+    gamma = np.zeros(maxiter + 2, np.complex128)
     gamma[1] = rk_norm
     H = [None]
     
@@ -97,37 +100,45 @@ def GMRES(A, b, x0, maxiter=1000, eps=1e-4
             z = v[k]
         qk = apply_A(z)
         
-        Hk = np.zeros(k + 2)
+        Hk = np.zeros(k + 2, np.complex128)
         for i in range(1, k + 1):
             Hk[i] = innerproduct(v[i], qk)
         for i in range(1, k + 1):
             qk -= Hk[i] * v[i]
             
-        Hk[k+1] = np.linalg.norm(qk)
+        Hk[k+1] = np.sqrt(innerproduct(qk, qk).real)
+        v.append(qk / Hk[k+1])
 
         for i in range(1, k):
+            # (c   s ) [a]   [a']
+            # (-s* c*) [b] = [b']
             tmp = cs[i+1] * Hk[i] + sn[i+1] * Hk[i+1]
-            Hk[i+1] = -sn[i+1] * Hk[i] + cs[i+1] * Hk[i+1]
+            Hk[i+1] = -np.conj(sn[i+1]) * Hk[i] + np.conj(cs[i+1]) * Hk[i+1]
             Hk[i] = tmp
             
 
-        beta = np.sqrt(Hk[k]**2 + Hk[k + 1]**2)
+        beta = np.sqrt(np.abs(Hk[k])**2 + np.abs(Hk[k + 1])**2)
+
+        # ( c    s )[a]   [X]
+        # (-s*   c*)[b] = [0]
+        # is solved by 
+        # s* = b; c* = a
+        sn[k+1] = np.conj(Hk[k+1]) / beta
+        cs[k+1] = np.conj(Hk[k]) / beta
+        Hk[k] = cs[k+1] * Hk[k] + sn[k+1] * Hk[k+1]
+        Hk[k+1] = 0
         
-        sn[k+1] = Hk[k+1] / beta
-        cs[k+1] = Hk[k] / beta
-        Hk[k] = beta
         
-        
-        gamma[k+1] = -sn[k+1] * gamma[k]
+        gamma[k+1] = -np.conj(sn[k+1]) * gamma[k]
         gamma[k] = cs[k+1] * gamma[k]
         
-        v.append(qk / Hk[k+1])
         H.append(Hk)
-        if abs(gamma[k+1]) <= eps:
+        print(np.abs(gamma[k+1]) / b_norm)
+        if np.abs(gamma[k+1]) / b_norm <= eps:
             converged = True
             break
 
-    y = np.zeros(k+1)
+    y = np.zeros(k+1, np.complex128)
     for i in reversed(range(1, k + 1)):
         overlap = 0
         for j in range(i+1, k+1):
@@ -138,7 +149,6 @@ def GMRES(A, b, x0, maxiter=1000, eps=1e-4
     else:
         x = x0 + sum(yi * prec(vi) for yi, vi in zip(y[1:], v[1:]))
     return x, {"converged": converged, "k": k}
-
 
 
 try:

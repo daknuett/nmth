@@ -133,7 +133,6 @@ def GMRES(A, b, x0, maxiter=1000, eps=1e-4
         gamma[k] = cs[k+1] * gamma[k]
         
         H.append(Hk)
-        print(np.abs(gamma[k+1]) / b_norm)
         if np.abs(gamma[k+1]) / b_norm <= eps:
             converged = True
             break

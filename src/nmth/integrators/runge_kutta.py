@@ -75,3 +75,31 @@ class Euler1(runge_kutta):
         self.nodes = [0.0]
         self.rk_matrix = [[0.0]]
 
+class Midpoint(runge_kutta):
+    def __init__(self):
+        self.weights = [0.0, 1.0]
+        self.nodes = [0.0, 0.5]
+        self.rk_matrix = [[0.0], [0.5, 0.0]]
+
+class SecondOrderRK(runge_kutta):
+    def __init__(self, alpha):
+        if alpha <= 0:
+            raise ValueError("alpha must be in (0, 1]")
+        if alpha > 1:
+            raise ValueError("alpha must be in (0, 1]")
+        
+        self.weights = [1 - 1/(2*alpha), 1 / (2*alpha)]
+        self.nodes = [0.0, alpha]
+        self.rk_matrix = [[0.0], [alpha, 0.0]]
+
+class Midpoint(SecondOrderRK):
+    def __init__(self):
+        super().__init__(0.5)
+
+class HeunsMethod(SecondOrderRK):
+    def __init__(self):
+        super().__init__(1.0)
+    
+class RalstonsMethod(SecondOrderRK):
+    def __init__(self):
+        super().__init__(2/3)
